@@ -1,0 +1,108 @@
+# Multi-Base Pattern Example
+# Shows how to compose multiple base configurations
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: multi-base-example
+  annotations:
+    description: |
+      This demonstrates composing multiple base configurations:
+      - Application base (web-app, database)
+      - Infrastructure base (ingress, monitoring)
+      - Security base (policies, RBAC)
+
+# Multiple bases - order matters for dependencies
+resources:
+# Core application components
+- ../../base/
+
+# Infrastructure components (separate base)
+- ../../../shared-infrastructure/base/
+
+# Security components (separate base) 
+- ../../../security-baseline/base/
+
+# Additional environment-specific resources
+- multi-cluster-service.yaml
+- cross-region-ingress.yaml
+
+# Components from different sources
+components:
+- ../../components/monitoring
+- ../../components/security
+- ../../../shared-components/logging
+- ../../../shared-components/backup
+
+namespace: multi-base-production
+
+namePrefix: multi-
+
+commonLabels:
+  pattern: multi-base
+  complexity: advanced
+  multi-cluster: "true"
+
+# Coordinate patches across multiple bases
+patches:
+# Patch from application base
+- target:
+    kind: Deployment
+    name: web-app
+  patch: |-
+    spec:
+      replicas: 10
+      template:
+        spec:
+          nodeSelector:
+            workload-type: application
+
+# Patch from infrastructure base  
+- target:
+    kind: Ingress
+    name: shared-ingress
+  patch: |-
+    metadata:
+      annotations:
+        cert-manager.io/cluster-issuer: production-issuer
+    spec:
+      rules:
+      - host: multi.production.example.com
+
+# Patch from security base
+- target:
+    kind: NetworkPolicy
+    name: default-deny
+  patch: |-
+    spec:
+      podSelector:
+        matchLabels:
+          pattern: multi-base
+
+# Cross-base coordination using replacements
+replacements:
+- source:
+    kind: Service
+    name: web-app-service
+    fieldPath: metadata.name
+  targets:
+  - select:
+      kind: Ingress
+      name: shared-ingress
+    fieldPaths:
+    - spec.rules.[host=multi.production.example.com].http.paths.[path=/].backend.service.name
+
+images:
+- name: nginx
+  newTag: 1.21.6-alpine@sha256:2f770d2fe27bc85f68fd7fe6a63900ef7076bc703022fe81b980377fe3d27b70
+- name: postgres  
+  newTag: 14.7-alpine@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+
+configMapGenerator:
+- name: multi-base-config
+  literals:
+  - base_count="3"
+  - component_count="4"
+  - pattern="multi-base"
+  - coordination_strategy="replacements"

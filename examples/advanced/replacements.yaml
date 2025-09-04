@@ -1,0 +1,63 @@
+# Advanced Kustomize Feature: Replacements
+# Replacements allow you to substitute values across resources
+# This is the modern replacement for the deprecated "vars" feature
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../../base
+
+# Advanced variable replacement examples
+replacements:
+# Replace service name in ConfigMap from Service metadata
+- source:
+    kind: Service
+    name: web-app-service
+    fieldPath: metadata.name
+  targets:
+  - select:
+      kind: ConfigMap
+      name: app-config
+    fieldPaths:
+    - data.service_name
+
+# Replace namespace from current kustomization
+- source:
+    kind: Kustomization
+    fieldPath: metadata.namespace
+  targets:
+  - select:
+      kind: Deployment
+    fieldPaths:
+    - spec.template.spec.containers.[name=webapp].env.[name=NAMESPACE].value
+
+# Replace image tag from Deployment in ConfigMap
+- source:
+    kind: Deployment
+    name: web-app
+    fieldPath: spec.template.spec.containers.[name=webapp].image
+  targets:
+  - select:
+      kind: ConfigMap
+      name: app-config
+    fieldPaths:
+    - data.current_image
+
+# Replace storage class from StatefulSet in monitoring ConfigMap
+- source:
+    kind: StatefulSet
+    name: postgres
+    fieldPath: spec.volumeClaimTemplates.[name=postgres-storage].spec.storageClassName
+  targets:
+  - select:
+      kind: ConfigMap
+      name: monitoring-config
+    fieldPaths:
+    - data.storage_class
+
+namespace: advanced-replacements
+
+commonLabels:
+  example: replacements
+  feature: advanced

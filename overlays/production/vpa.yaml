@@ -1,0 +1,43 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: web-app-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-app
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: web-app
+      minAllowed:
+        cpu: 100m
+        memory: 128Mi
+      maxAllowed:
+        cpu: 2000m
+        memory: 2Gi
+      controlledResources: ["cpu", "memory"]
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: postgres-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: postgres
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: postgres
+      minAllowed:
+        cpu: 500m
+        memory: 1Gi
+      maxAllowed:
+        cpu: 4000m
+        memory: 8Gi
+      controlledResources: ["cpu", "memory"]

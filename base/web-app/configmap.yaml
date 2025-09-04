@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  labels:
+    app: web-app
+data:
+  database-host: "postgres-service"
+  database-port: "5432"
+  database-name: "webapp_db"
+  log-level: "info"
+  max-connections: "100"
+  session-timeout: "3600"

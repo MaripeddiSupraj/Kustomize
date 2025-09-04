@@ -1,0 +1,31 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: web-app-monitor
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: web-app
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres-monitor
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  endpoints:
+  - port: postgres
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

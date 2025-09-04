@@ -1,0 +1,72 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: web-app-dev
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+# Reference to base configuration
+resources:
+- ../../base
+
+# Namespace for development
+namespace: webapp-dev
+
+# Name prefix for resources
+namePrefix: dev-
+
+# Common labels for development environment
+commonLabels:
+  environment: development
+  tier: dev
+
+# Common annotations for development
+commonAnnotations:
+  environment: development
+  config.kubernetes.io/origin: |
+    path: overlays/dev/kustomization.yaml
+
+# Override images for development
+images:
+- name: nginx
+  newTag: 1.21-alpine
+- name: postgres
+  newTag: 14-alpine
+
+# Override replicas for development (smaller footprint)
+replicas:
+- name: web-app
+  count: 1
+
+# Patches for development environment
+patches:
+- target:
+    kind: Deployment
+    name: web-app
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/0/value
+      value: "development"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "64Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+
+# Override ConfigMap for development
+configMapGenerator:
+- name: app-config
+  behavior: merge
+  literals:
+  - log-level=debug
+  - max-connections=10
+
+# Override Secret for development
+secretGenerator:
+- name: db-credentials
+  behavior: replace
+  literals:
+  - username=dev_user
+  - password=dev_password123

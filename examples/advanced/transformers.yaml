@@ -1,0 +1,92 @@
+# Advanced Transformer Examples
+# Custom transformers for complex resource modifications
+
+apiVersion: builtin
+kind: PrefixSuffixTransformer
+metadata:
+  name: advanced-naming
+spec:
+  prefix: enterprise-
+  suffix: -v2
+  fieldSpecs:
+  - path: metadata/name
+    kind: Deployment
+  - path: metadata/name
+    kind: Service
+  - path: spec/selector/matchLabels/app
+    kind: Deployment
+  - path: spec/selector/app
+    kind: Service
+
+---
+apiVersion: builtin
+kind: LabelTransformer
+metadata:
+  name: environment-labels
+spec:
+  labels:
+    environment: production
+    cost-center: engineering
+    compliance: pci-dss
+    backup-policy: daily
+    monitoring: prometheus
+  fieldSpecs:
+  - path: metadata/labels
+    create: true
+  - path: spec/selector/matchLabels
+    create: true
+    kind: Deployment
+  - path: spec/template/metadata/labels
+    create: true
+    kind: Deployment
+
+---
+apiVersion: builtin
+kind: AnnotationsTransformer
+metadata:
+  name: compliance-annotations
+spec:
+  annotations:
+    security.compliance.io/scan-level: "strict"
+    network.policy.io/isolation: "strict"
+    backup.policy.io/retention: "90d"
+    monitoring.prometheus.io/scrape: "true"
+    monitoring.prometheus.io/port: "8080"
+    cert-manager.io/cluster-issuer: "production-ca"
+  fieldSpecs:
+  - path: metadata/annotations
+    create: true
+  - path: spec/template/metadata/annotations
+    create: true
+    kind: Deployment
+
+---
+apiVersion: builtin
+kind: ReplicaCountTransformer
+metadata:
+  name: high-availability-replicas
+spec:
+  replica:
+    name: web-app
+    count: 10
+  fieldSpecs:
+  - path: spec/replicas
+    kind: Deployment
+  - path: spec/replicas  
+    kind: StatefulSet
+
+---
+apiVersion: builtin
+kind: ImageTransformer
+metadata:
+  name: secure-images
+spec:
+  images:
+  - name: nginx
+    newName: gcr.io/secure-registry/nginx
+    newTag: 1.21.6-distroless
+    digest: sha256:2f770d2fe27bc85f68fd7fe6a63900ef7076bc703022fe81b980377fe3d27b70
+  - name: postgres
+    newName: gcr.io/secure-registry/postgres
+    newTag: 14.7-hardened
+    digest: sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef

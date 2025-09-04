@@ -1,0 +1,42 @@
+# OpenAPI Schema Validation Example
+# Demonstrates how to use OpenAPI schemas for validation with Kustomize
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: openapi-validation-example
+
+# OpenAPI schema validation configuration
+openapi:
+  # Path to custom OpenAPI schema files
+  path: openapi-schema/
+
+resources:
+- deployment.yaml
+- service.yaml
+
+# Generators with validation
+configMapGenerator:
+- name: validated-config
+  literals:
+  - app_name=web-app
+  - port="8080"
+  - replicas="3"
+  options:
+    # Disable name suffix for predictable names
+    disableNameSuffixHash: true
+
+# Validation transformers
+transformers:
+- validation-transformer.yaml
+
+commonLabels:
+  validation: enabled
+  schema: openapi
+
+patchesStrategicMerge:
+- validated-patch.yaml
+
+# Built-in validation options
+buildMetadata: [originAnnotations, transformerAnnotations]

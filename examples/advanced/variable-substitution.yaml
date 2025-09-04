@@ -1,0 +1,107 @@
+# Variable Substitution Pattern Example
+# Advanced patterns for dynamic configuration
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: variable-substitution
+  # Variables can be defined in metadata
+  variables:
+    cluster_name: "gke-production-us-central1"
+    region: "us-central1"
+    environment: "production"
+    cost_center: "engineering"
+
+resources:
+- deployment-with-vars.yaml
+- configmap-with-vars.yaml
+- service-with-vars.yaml
+
+# Use replacements for variable substitution
+replacements:
+# Substitute cluster name from annotation
+- source:
+    kind: Kustomization
+    fieldPath: metadata.annotations.cluster-name
+  targets:
+  - select:
+      kind: ConfigMap
+    fieldPaths:
+    - data.cluster_name
+  - select:
+      kind: Deployment
+    fieldPaths:
+    - spec.template.spec.containers.[name=webapp].env.[name=CLUSTER_NAME].value
+
+# Dynamic resource limits based on environment
+- source:
+    kind: Kustomization  
+    fieldPath: metadata.annotations.environment
+  targets:
+  - select:
+      kind: Deployment
+    fieldPaths:
+    - metadata.labels.environment
+    - spec.template.metadata.labels.environment
+
+# Cost center propagation
+- source:
+    kind: Kustomization
+    fieldPath: metadata.annotations.cost-center
+  targets:
+  - select:
+      kind: Deployment
+    fieldPaths:
+    - metadata.labels.cost-center
+  - select:
+      kind: Service
+    fieldPaths:
+    - metadata.labels.cost-center
+
+# Dynamic storage class based on region
+- source:
+    kind: Kustomization
+    fieldPath: metadata.annotations.region  
+  targets:
+  - select:
+      kind: StatefulSet
+    fieldPaths:
+    - spec.volumeClaimTemplates.[name=data].spec.storageClassName
+    options:
+      delimiter: "."
+      index: 0
+
+# ConfigMap generator with variable substitution
+configMapGenerator:
+- name: dynamic-config
+  literals:
+  - CLUSTER_NAME=$(CLUSTER_NAME)
+  - REGION=$(REGION) 
+  - ENVIRONMENT=$(ENVIRONMENT)
+  - COST_CENTER=$(COST_CENTER)
+  - NAMESPACE=$(KUSTOMIZE_NAMESPACE)
+  - BUILD_DATE=$(BUILD_DATE)
+  - GIT_SHA=$(GIT_SHA)
+  options:
+    disableNameSuffixHash: false
+
+# Namespace with variable
+namespace: webapp-$(ENVIRONMENT)
+
+# Labels with variables
+commonLabels:
+  cluster: $(CLUSTER_NAME)
+  region: $(REGION)
+  environment: $(ENVIRONMENT)
+  cost-center: $(COST_CENTER)
+
+# Annotations with build metadata
+commonAnnotations:
+  cluster-name: "gke-production-us-central1"
+  region: "us-central1"
+  environment: "production"
+  cost-center: "engineering"
+  build-date: "2024-01-15T10:30:00Z"
+  git-sha: "abc123def456"
+  kustomize-version: "v5.0.0"

@@ -1,0 +1,50 @@
+# Plugin System Example
+# Demonstrates Kustomize plugin architecture
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: plugin-example
+  annotations:
+    note: |
+      This demonstrates the Kustomize plugin system.
+      Plugins extend Kustomize functionality for custom transformations.
+
+# Enable alpha features for plugins
+generators:
+# Custom secret generator plugin
+- secret-generator-plugin.yaml
+
+# Custom config generator plugin  
+- config-generator-plugin.yaml
+
+transformers:
+# Custom resource transformer plugin
+- resource-transformer-plugin.yaml
+
+# Custom validation transformer
+- validation-transformer-plugin.yaml
+
+# Exec plugin example (runs external command)
+- exec-plugin.yaml
+
+# Go plugin example (compiled Go plugin)
+- go-plugin.yaml
+
+resources:
+- deployment.yaml
+- service.yaml
+
+# Plugin configuration examples stored in separate files
+# These would contain actual plugin configurations
+
+namespace: plugin-demo
+
+commonLabels:
+  feature: plugins
+  complexity: expert
+  
+commonAnnotations:
+  plugin.kustomize.io/enabled: "true"
+  alpha.kustomize.io/enabled: "true"

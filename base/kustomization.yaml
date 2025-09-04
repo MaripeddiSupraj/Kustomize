@@ -1,0 +1,58 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: web-app-base
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: web-app
+  app.kubernetes.io/part-of: web-application
+  app.kubernetes.io/managed-by: kustomize
+
+# Common annotations applied to all resources
+commonAnnotations:
+  config.kubernetes.io/origin: |
+    path: base/kustomization.yaml
+  app.kubernetes.io/version: "1.0.0"
+
+# Resources to include
+resources:
+- web-app/deployment.yaml
+- web-app/service.yaml
+- web-app/configmap.yaml
+- database/statefulset.yaml
+- database/service.yaml
+
+# Secret generator for database credentials
+secretGenerator:
+- name: db-credentials
+  literals:
+  - username=webapp_user
+  - password=changeme123
+  type: Opaque
+
+# ConfigMap generator for shared configuration
+configMapGenerator:
+- name: shared-config
+  literals:
+  - timezone=UTC
+  - log_format=json
+  - debug=false
+
+# Images to be used (can be overridden in overlays)
+images:
+- name: nginx
+  newTag: 1.21-alpine
+- name: postgres
+  newTag: 14-alpine
+
+# Namespace (can be overridden in overlays)
+namespace: default
+
+# Replicas (can be overridden in overlays)
+replicas:
+- name: web-app
+  count: 2

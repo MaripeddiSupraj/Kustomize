@@ -1,0 +1,90 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: web-app-staging
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+# Reference to base configuration
+resources:
+- ../../base
+- ingress.yaml
+- hpa.yaml
+- network-policy.yaml
+
+# Namespace for staging
+namespace: webapp-staging
+
+# Name prefix for resources
+namePrefix: staging-
+
+# Common labels for staging environment
+commonLabels:
+  environment: staging
+  tier: staging
+
+# Common annotations for staging
+commonAnnotations:
+  environment: staging
+  config.kubernetes.io/origin: |
+    path: overlays/staging/kustomization.yaml
+
+# Override images for staging (use specific tags)
+images:
+- name: nginx
+  newTag: 1.21.6-alpine
+- name: postgres
+  newTag: 14.7-alpine
+
+# Override replicas for staging
+replicas:
+- name: web-app
+  count: 3
+
+# Patches for staging environment
+patches:
+- target:
+    kind: Deployment
+    name: web-app
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/0/value
+      value: "staging"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "256Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "200m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "500m"
+
+- target:
+    kind: StatefulSet
+    name: postgres
+  patch: |-
+    - op: replace
+      path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+      value: "50Gi"
+
+# Override ConfigMap for staging
+configMapGenerator:
+- name: app-config
+  behavior: merge
+  literals:
+  - log-level=warn
+  - max-connections=50
+  - backup-enabled=true
+
+# Override Secret for staging (will be managed externally in production)
+secretGenerator:
+- name: db-credentials
+  behavior: replace
+  literals:
+  - username=staging_user
+  - password=staging_secure_password456

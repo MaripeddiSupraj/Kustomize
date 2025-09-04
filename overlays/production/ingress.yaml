@@ -1,0 +1,64 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-app-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "web-app-prod-ip"
+    networking.gke.io/managed-certificates: "web-app-ssl-cert"
+    kubernetes.io/ingress.allow-http: "false"
+    cloud.google.com/armor-config: '{"web-app-armor-policy": "web-app-security-policy"}'
+    cloud.google.com/backend-config: '{"default": "web-app-backend-config"}'
+spec:
+  rules:
+  - host: app.your-domain.com
+    http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: web-app-service
+            port:
+              number: 80
+  - host: www.your-domain.com
+    http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: web-app-service
+            port:
+              number: 80
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: web-app-ssl-cert
+spec:
+  domains:
+  - app.your-domain.com
+  - www.your-domain.com
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: web-app-backend-config
+spec:
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /health
+    port: 8080
+  sessionAffinity:
+    affinityType: "CLIENT_IP"
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 60
+  logging:
+    enable: true
+    sampleRate: 1.0

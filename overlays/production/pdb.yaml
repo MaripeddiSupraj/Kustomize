@@ -1,0 +1,19 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-app-pdb
+spec:
+  selector:
+    matchLabels:
+      app: web-app
+  minAvailable: 3
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-pdb
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  minAvailable: 2

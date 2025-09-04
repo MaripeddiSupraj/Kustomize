@@ -1,0 +1,134 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: web-app-production
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+# Reference to base configuration
+resources:
+- ../../base
+- ingress.yaml
+- hpa.yaml
+- vpa.yaml
+- pdb.yaml
+- network-policy.yaml
+- service-monitor.yaml
+- backup-cronjob.yaml
+
+# Namespace for production
+namespace: webapp-prod
+
+# Name prefix for resources
+namePrefix: prod-
+
+# Common labels for production environment
+commonLabels:
+  environment: production
+  tier: production
+  criticality: high
+
+# Common annotations for production
+commonAnnotations:
+  environment: production
+  config.kubernetes.io/origin: |
+    path: overlays/production/kustomization.yaml
+  monitoring.coreos.com/scrape: "true"
+
+# Override images for production (use specific SHA digests for immutability)
+images:
+- name: nginx
+  newTag: 1.21.6-alpine@sha256:2f770d2fe27bc85f68fd7fe6a63900ef7076bc703022fe81b980377fe3d27b70
+- name: postgres
+  newTag: 14.7-alpine@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+
+# Override replicas for production
+replicas:
+- name: web-app
+  count: 5
+
+# Patches for production environment
+patches:
+- target:
+    kind: Deployment
+    name: web-app
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/0/value
+      value: "production"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "500m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "1Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "1000m"
+    - op: add
+      path: /spec/template/spec/affinity
+      value:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - web-app
+              topologyKey: kubernetes.io/hostname
+
+- target:
+    kind: StatefulSet
+    name: postgres
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 3
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "1Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "500m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "2Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "1000m"
+    - op: replace
+      path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+      value: "100Gi"
+    - op: replace
+      path: /spec/volumeClaimTemplates/0/spec/storageClassName
+      value: "ssd-retain"
+
+# Override ConfigMap for production
+configMapGenerator:
+- name: app-config
+  behavior: merge
+  literals:
+  - log-level=error
+  - max-connections=200
+  - backup-enabled=true
+  - monitoring-enabled=true
+  - cache-ttl=3600
+
+# Don't generate secrets in production - they should be managed externally
+# Production secrets must be created separately using:
+# - Google Secret Manager
+# - External Secrets Operator  
+# - Manual kubectl create secret commands
+# 
+# Example:
+# kubectl create secret generic db-credentials \
+#   --from-literal=username="$(gcloud secrets versions access latest --secret=db-username)" \
+#   --from-literal=password="$(gcloud secrets versions access latest --secret=db-password)" \
+#   -n webapp-prod

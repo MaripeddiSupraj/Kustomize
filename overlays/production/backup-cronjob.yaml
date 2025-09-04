@@ -1,0 +1,99 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: postgres-backup
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+          - name: postgres-backup
+            image: postgres:14-alpine
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              BACKUP_FILE="backup-$(date +%Y%m%d-%H%M%S).sql"
+              echo "Starting backup: $BACKUP_FILE"
+              
+              pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME > /backup/$BACKUP_FILE
+              
+              # Upload to GCS
+              gsutil cp /backup/$BACKUP_FILE gs://$BACKUP_BUCKET/postgres/
+              
+              # Keep only last 7 days locally
+              find /backup -name "backup-*.sql" -mtime +7 -delete
+              
+              echo "Backup completed: $BACKUP_FILE"
+            env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: database-host
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: database-name
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: password
+            - name: BACKUP_BUCKET
+              value: "your-backup-bucket-prod"
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+          serviceAccountName: postgres-backup-sa
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: ssd-retain
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-backup-sa
+  annotations:
+    iam.gke.io/gcp-service-account: postgres-backup@your-project.iam.gserviceaccount.com
